@@ -30,11 +30,33 @@ pub const InitResponse = struct {
 pub const Node = struct {
     stdinReader: std.io.Reader,
     stdoutWrite: std.io.Writer,
+    allocator: std.mem.Allocator,
+    initMessage: InitMessageBody,
+    handlers: std.StringHashMap(HandlerFunc),
 
-    pub fn init(_: std.mem.Allocator, stdinReader: std.io.Reader, stdoutWrite: std.io.Writer) !Node {
+    pub fn newNode(_: std.mem.Allocator, stdinReader: std.io.Reader, stdoutWrite: std.io.Writer) !Node {
         return Node{ .stdinReader = stdinReader, .stdoutWrite = stdoutWrite };
     }
+
+    pub fn initMsg(self: *Node, initMessage: InitMessageBody) void {
+        self.initMessage = initMessage;
+    }
+
+    pub fn handle(self: *Node, message: Message) anyerror!void {
+        const handler = self.handlers.get(message.body.type);
+        if (handler) |_| {
+            return error.HandlerAlreadyRegistered;
+        }
+        try self.handlers.put(message.body.type, handler);
+    }
+    pub fn run(self: *Node) void {
+        _ = self;
+    }
 };
+
+pub const HandlerAlreadyRegistered = error{HandlerAlreadyRegistered};
+
+pub const HandlerFunc = fn (message: Message) anyerror!void;
 
 test "json parse body" {
     const parsed = try std.json.parseFromSlice(
